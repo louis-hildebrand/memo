@@ -37,6 +37,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.louishildebrand.memo.ui.theme.MemoTheme
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.TimeSource
+import kotlin.time.toDuration
 
 val ALLOWED_CHARS = ('A'..'B') + ('D'..'X')
 
@@ -54,10 +58,18 @@ class MainActivity : ComponentActivity() {
 
 sealed interface AppState {
     data object Start : AppState
-    data class Memo(val target: String, val idx: Int) : AppState
-    data class Check(val target: String, val guess: String) : AppState
-    data object Success : AppState
-    data class Failure(val target: String, val guess: String) : AppState
+    data class Memo(
+        val target: String,
+        val idx: Int,
+        val start: TimeSource.Monotonic.ValueTimeMark
+    ) : AppState
+    data class Check(
+        val target: String,
+        val guess: String,
+        val duration: Duration
+    ) : AppState
+    data class Success(val duration: Duration) : AppState
+    data class Failure(val target: String, val guess: String, val duration: Duration) : AppState
 }
 
 @Composable
@@ -76,7 +88,11 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
             AppState.Start ->
                 Surface(
                     onClick = {
-                        state = AppState.Memo(target = makeTarget(allowedChars, len), idx = 0)
+                        state = AppState.Memo(
+                            target = makeTarget(allowedChars, len),
+                            idx = 0,
+                            start = TimeSource.Monotonic.markNow()
+                        )
                     }
                 ) {
                     StartScreen()
@@ -86,9 +102,10 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                 Surface(
                     onClick = {
                         state = if (s.idx + 1 == s.target.length) {
-                            AppState.Check(target = s.target, guess = "")
+                            val now = TimeSource.Monotonic.markNow()
+                            AppState.Check(target = s.target, guess = "", duration = now - s.start)
                         } else {
-                            AppState.Memo(target = s.target, idx = s.idx + 1)
+                            AppState.Memo(target = s.target, idx = s.idx + 1, start = s.start)
                         }
                     },
                 ) {
@@ -101,36 +118,51 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                 CheckScreen(
                     currentGuess = s.guess,
                     update = { guess ->
-                        state = AppState.Check(target = s.target, guess = guess.uppercase())
+                        state = AppState.Check(
+                            target = s.target,
+                            guess = guess.uppercase(),
+                            duration = s.duration
+                        )
                     },
                     submit = {
                         state = if (s.guess.uppercase() == s.target.uppercase()) {
-                            AppState.Success
+                            AppState.Success(duration = s.duration)
                         } else {
-                            AppState.Failure(target = s.target, guess = s.guess)
+                            AppState.Failure(
+                                target = s.target,
+                                guess = s.guess,
+                                duration = s.duration
+                            )
                         }
                     }
                 )
             }
-            AppState.Success -> {
+            is AppState.Success -> {
+                val s = state as AppState.Success
                 Surface(
                     onClick = {
-                        state = AppState.Memo(target = makeTarget(allowedChars, len), idx = 0)
+                        state = AppState.Memo(
+                            target = makeTarget(allowedChars, len),
+                            idx = 0,
+                            start = TimeSource.Monotonic.markNow()
+                        )
                     }
                 ) {
-                    SuccessScreen()
+                    SuccessScreen(duration = s.duration)
                 }
             }
             is AppState.Failure -> {
+                val s = state as AppState.Failure
                 Surface(
                     onClick = {
-                        state = AppState.Memo(target = makeTarget(allowedChars, len), idx = 0)
+                        state = AppState.Memo(
+                            target = makeTarget(allowedChars, len),
+                            idx = 0,
+                            start = TimeSource.Monotonic.markNow()
+                        )
                     }
                 ) {
-                    FailureScreen(
-                        target = (state as AppState.Failure).target,
-                        guess = (state as AppState.Failure).guess
-                    )
+                    FailureScreen(target = s.target, guess = s.guess, duration = s.duration)
                 }
             }
         }
@@ -159,6 +191,17 @@ fun StartMessage() {
         stringResource(R.string.tap_to_start),
         fontSize = 32.sp,
         fontStyle = FontStyle.Italic
+    )
+}
+
+@Composable
+fun DurationMessage(duration: Duration) {
+    Text(
+        duration
+            .toLong(DurationUnit.MILLISECONDS)
+            .toDuration(DurationUnit.MILLISECONDS)
+            .toString(),
+        fontSize = 32.sp
     )
 }
 
@@ -228,7 +271,10 @@ fun CheckScreen(
 
 @Preview(showBackground = true)
 @Composable
-fun SuccessScreen(modifier: Modifier = Modifier) {
+fun SuccessScreen(
+        modifier: Modifier = Modifier,
+        duration: Duration = Duration.parse("42s 530ms")
+) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = Color(140, 217, 140),
@@ -250,6 +296,13 @@ fun SuccessScreen(modifier: Modifier = Modifier) {
         ) {
             StartMessage()
         }
+        Column(
+            modifier = Modifier.safeContentPadding().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Bottom
+        ) {
+            DurationMessage(duration)
+        }
     }
 }
 
@@ -258,7 +311,8 @@ fun SuccessScreen(modifier: Modifier = Modifier) {
 fun FailureScreen(
         modifier: Modifier = Modifier,
         target: String = "ABCDEFGHIJKL",
-        guess: String = "ADCBEFGHIJK"
+        guess: String = "ADCBEFGHIJK",
+        duration: Duration = Duration.parse("42s 530ms")
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -331,6 +385,13 @@ fun FailureScreen(
             verticalArrangement = Arrangement.Center
         ) {
             StartMessage()
+        }
+        Column(
+            modifier = Modifier.safeContentPadding().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Bottom
+        ) {
+            DurationMessage(duration = duration)
         }
     }
 }
