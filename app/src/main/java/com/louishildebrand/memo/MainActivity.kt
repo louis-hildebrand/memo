@@ -1,18 +1,25 @@
 package com.louishildebrand.memo
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -34,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.UiMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.louishildebrand.memo.ui.theme.MemoTheme
@@ -66,11 +74,20 @@ sealed interface AppState {
     ) : AppState
     data class Check(
         val target: String,
-        val guess: String,
-        val duration: Duration
+        val partialGuess: String,
+        val memoDuration: Duration,
+        val recallStart: TimeSource.Monotonic.ValueTimeMark
     ) : AppState
-    data class Success(val duration: Duration) : AppState
-    data class Failure(val target: String, val guess: String, val duration: Duration) : AppState
+    data class Success(
+        val memoDuration: Duration,
+        val recallDuration: Duration
+    ) : AppState
+    data class Failure(
+        val target: String,
+        val guess: String,
+        val memoDuration: Duration,
+        val recallDuration: Duration
+    ) : AppState
 }
 
 @Composable
@@ -106,7 +123,12 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                         state = if (s.idx + 1 == s.target.length) {
                             val now = TimeSource.Monotonic.markNow()
                             val duration = truncateDuration(now - s.start)
-                            AppState.Check(target = s.target, guess = "", duration = duration)
+                            AppState.Check(
+                                target = s.target,
+                                partialGuess = "",
+                                memoDuration = duration,
+                                recallStart = now
+                            )
                         } else {
                             AppState.Memo(target = s.target, idx = s.idx + 1, start = s.start)
                         }
@@ -119,22 +141,29 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                 val s = state as AppState.Check
                 // TODO: Surely there's a better way
                 CheckScreen(
-                    currentGuess = s.guess,
+                    currentGuess = s.partialGuess,
                     update = { guess ->
                         state = AppState.Check(
                             target = s.target,
-                            guess = guess.uppercase(),
-                            duration = s.duration
+                            partialGuess = guess.uppercase(),
+                            memoDuration = s.memoDuration,
+                            recallStart = s.recallStart
                         )
                     },
                     submit = {
-                        state = if (s.guess.uppercase() == s.target.uppercase()) {
-                            AppState.Success(duration = s.duration)
+                        val now = TimeSource.Monotonic.markNow()
+                        val recallDuration = truncateDuration(now - s.recallStart)
+                        state = if (s.partialGuess.uppercase() == s.target.uppercase()) {
+                            AppState.Success(
+                                memoDuration = s.memoDuration,
+                                recallDuration = recallDuration
+                            )
                         } else {
                             AppState.Failure(
                                 target = s.target,
-                                guess = s.guess,
-                                duration = s.duration
+                                guess = s.partialGuess,
+                                memoDuration = s.memoDuration,
+                                recallDuration = recallDuration
                             )
                         }
                     }
@@ -151,7 +180,10 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                         )
                     }
                 ) {
-                    SuccessScreen(duration = s.duration)
+                    SuccessScreen(
+                        memoDuration = s.memoDuration,
+                        recallDuration = s.recallDuration
+                    )
                 }
             }
             is AppState.Failure -> {
@@ -165,7 +197,12 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                         )
                     }
                 ) {
-                    FailureScreen(target = s.target, guess = s.guess, duration = s.duration)
+                    FailureScreen(
+                        target = s.target,
+                        guess = s.guess,
+                        memoDuration = s.memoDuration,
+                        recallDuration = s.recallDuration
+                    )
                 }
             }
         }
@@ -198,11 +235,74 @@ fun StartMessage() {
 }
 
 @Composable
-fun DurationMessage(duration: Duration) {
-    Text(
-        displayDuration(duration),
-        fontSize = 64.sp
-    )
+fun DurationMessage(
+    memoDuration: Duration,
+    recallDuration: Duration,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(IntrinsicSize.Max),
+        horizontalAlignment = Alignment.End
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "(memo)",
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 18.sp,
+                fontStyle = FontStyle.Italic
+            )
+            Spacer(modifier = Modifier.size(16.dp))
+            Text(
+                displayDuration(memoDuration),
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 52.sp
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "(recall)",
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 18.sp,
+                fontStyle = FontStyle.Italic
+            )
+            Spacer(modifier = Modifier.size(16.dp))
+            Text(
+                displayDuration(recallDuration),
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 52.sp
+            )
+        }
+        HorizontalDivider(
+            thickness = 3.dp,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "(total)",
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 18.sp,
+                fontStyle = FontStyle.Italic
+            )
+            Spacer(modifier = Modifier.size(16.dp))
+            Text(
+                displayDuration(memoDuration + recallDuration),
+                modifier = Modifier.alignByBaseline(),
+                fontSize = 52.sp
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true)
@@ -273,7 +373,8 @@ fun CheckScreen(
 @Composable
 fun SuccessScreen(
         modifier: Modifier = Modifier,
-        duration: Duration = Duration.parse("42s 530ms")
+        memoDuration: Duration = Duration.parse("42s 530ms"),
+        recallDuration: Duration = Duration.parse("9s")
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -294,7 +395,7 @@ fun SuccessScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            DurationMessage(duration = duration)
+            DurationMessage(memoDuration = memoDuration, recallDuration = recallDuration)
         }
     }
 }
@@ -305,7 +406,8 @@ fun FailureScreen(
         modifier: Modifier = Modifier,
         target: String = "ABCDEFGHIJKL",
         guess: String = "ADCBEFGHIJK",
-        duration: Duration = Duration.parse("1m 15s 200ms")
+        memoDuration: Duration = Duration.parse("1m 5s 200ms"),
+        recallDuration: Duration = Duration.parse("10s 123ms")
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -373,7 +475,7 @@ fun FailureScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            DurationMessage(duration = duration)
+            DurationMessage(memoDuration = memoDuration, recallDuration = recallDuration)
         }
     }
 }
@@ -386,15 +488,22 @@ fun truncateDuration(duration: Duration): Duration {
 
 fun displayDuration(duration: Duration): String {
     duration.toComponents { days, hours, minutes, seconds, nanoseconds ->
-        var s = String.format(Locale.US, "%02d.%02d", seconds, nanoseconds / 10_000_000)
-        if (minutes != 0) {
-            s = String.format(Locale.US, "%d:%s", minutes, s)
-        }
+        val hundredths = nanoseconds / 10_000_000
         val totalHours = 24 * days + hours
-        if (totalHours != 0L) {
-            s = String.format(Locale.US, "%d:%s", totalHours, s)
+        if (totalHours == 0L && minutes == 0) {
+            return String.format(Locale.US, "%d.%02d", seconds, hundredths)
+        } else if (totalHours == 0L) {
+            return String.format(Locale.US, "%d:%02d.%02d", minutes, seconds, hundredths)
+        } else {
+            return String.format(
+                Locale.US,
+                "%d:%02d:%02d.%02d",
+                totalHours,
+                minutes,
+                seconds,
+                hundredths
+            )
         }
-        return s
     }
 }
 
