@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.louishildebrand.memo.ui.theme.MemoTheme
+import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
@@ -75,6 +76,7 @@ sealed interface AppState {
 @Composable
 fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
     // TODO: Fix colours to work in both light and dark modes
+    // TODO: Be more consistent with fonts (https://developer.android.com/codelabs/jetpack-compose-theming#5)
     // TODO: Let user choose allowed characters, memo length
     // TODO: Save results, show stats
     var state: AppState by remember { mutableStateOf(AppState.Start) }
@@ -103,7 +105,8 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                     onClick = {
                         state = if (s.idx + 1 == s.target.length) {
                             val now = TimeSource.Monotonic.markNow()
-                            AppState.Check(target = s.target, guess = "", duration = now - s.start)
+                            val duration = truncateDuration(now - s.start)
+                            AppState.Check(target = s.target, guess = "", duration = duration)
                         } else {
                             AppState.Memo(target = s.target, idx = s.idx + 1, start = s.start)
                         }
@@ -197,11 +200,8 @@ fun StartMessage() {
 @Composable
 fun DurationMessage(duration: Duration) {
     Text(
-        duration
-            .toLong(DurationUnit.MILLISECONDS)
-            .toDuration(DurationUnit.MILLISECONDS)
-            .toString(),
-        fontSize = 32.sp
+        displayDuration(duration),
+        fontSize = 64.sp
     )
 }
 
@@ -294,14 +294,7 @@ fun SuccessScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            StartMessage()
-        }
-        Column(
-            modifier = Modifier.safeContentPadding().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom
-        ) {
-            DurationMessage(duration)
+            DurationMessage(duration = duration)
         }
     }
 }
@@ -312,7 +305,7 @@ fun FailureScreen(
         modifier: Modifier = Modifier,
         target: String = "ABCDEFGHIJKL",
         guess: String = "ADCBEFGHIJK",
-        duration: Duration = Duration.parse("42s 530ms")
+        duration: Duration = Duration.parse("1m 15s 200ms")
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -341,9 +334,7 @@ fun FailureScreen(
                         target.forEachIndexed { i, c ->
                             val matches = guess.length > i && guess[i] == c
                             if (matches) {
-                                withStyle(style = SpanStyle(color = Color(130, 130, 125))) {
-                                    append(c.toString())
-                                }
+                                append(c.toString())
                             } else {
                                 withStyle(style = SpanStyle(color = Color(180, 0, 0))) {
                                     append(c.toString())
@@ -365,9 +356,7 @@ fun FailureScreen(
                         guess.forEachIndexed { i, c ->
                             val matches = target.length > i && target[i] == c
                             if (matches) {
-                                withStyle(style = SpanStyle(color = Color(130, 130, 125))) {
-                                    append(c.toString())
-                                }
+                                append(c.toString())
                             } else {
                                 withStyle(style = SpanStyle(color = Color(180, 0, 0))) {
                                     append(c.toString())
@@ -384,15 +373,28 @@ fun FailureScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            StartMessage()
-        }
-        Column(
-            modifier = Modifier.safeContentPadding().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom
-        ) {
             DurationMessage(duration = duration)
         }
+    }
+}
+
+fun truncateDuration(duration: Duration): Duration {
+    val millis = duration.toLong(DurationUnit.MILLISECONDS)
+    val truncated = (millis / 10L) * 10L
+    return truncated.toDuration(DurationUnit.MILLISECONDS)
+}
+
+fun displayDuration(duration: Duration): String {
+    duration.toComponents { days, hours, minutes, seconds, nanoseconds ->
+        var s = String.format(Locale.US, "%02d.%02d", seconds, nanoseconds / 10_000_000)
+        if (minutes != 0) {
+            s = String.format(Locale.US, "%d:%s", minutes, s)
+        }
+        val totalHours = 24 * days + hours
+        if (totalHours != 0L) {
+            s = String.format(Locale.US, "%d:%s", totalHours, s)
+        }
+        return s
     }
 }
 
