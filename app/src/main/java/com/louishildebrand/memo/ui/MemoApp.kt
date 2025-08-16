@@ -5,26 +5,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kotlin.time.Duration
-import kotlin.time.DurationUnit
-import kotlin.time.TimeSource
-import kotlin.time.toDuration
-
-val ALLOWED_CHARS = ('A'..'B') + ('D'..'X')
 
 @Composable
-fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
+fun MemoApp(viewModel: MemoViewModel) {
     // TODO: Fix colours to work in both light and dark modes
     // TODO: Be more consistent with fonts (https://developer.android.com/codelabs/jetpack-compose-theming#5)
     // TODO: Let user choose allowed characters, memo length
     // TODO: Save results, show stats
-    var state: AppState by remember { mutableStateOf(AppState.Start) }
+    val state: AppState by viewModel.state.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,13 +26,7 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
         when (state) {
             AppState.Start ->
                 Surface(
-                    onClick = {
-                        state = AppState.Memo(
-                            target = makeTarget(allowedChars, len),
-                            idx = 0,
-                            start = TimeSource.Monotonic.markNow()
-                        )
-                    }
+                    onClick = { viewModel.start() }
                 ) {
                     StartScreen()
                 }
@@ -48,20 +34,7 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
             is AppState.Memo -> {
                 val s = state as AppState.Memo
                 Surface(
-                    onClick = {
-                        state = if (s.idx + 1 == s.target.length) {
-                            val now = TimeSource.Monotonic.markNow()
-                            val duration = truncateDuration(now - s.start)
-                            AppState.Check(
-                                target = s.target,
-                                partialGuess = "",
-                                memoDuration = duration,
-                                recallStart = now
-                            )
-                        } else {
-                            AppState.Memo(target = s.target, idx = s.idx + 1, start = s.start)
-                        }
-                    },
+                    onClick = { viewModel.nextMemoLetter() },
                 ) {
                     MemoScreen(c = s.target[s.idx])
                 }
@@ -72,45 +45,15 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                 // TODO: Surely there's a better way
                 CheckScreen(
                     currentGuess = s.partialGuess,
-                    update = { guess ->
-                        state = AppState.Check(
-                            target = s.target,
-                            partialGuess = guess.uppercase(),
-                            memoDuration = s.memoDuration,
-                            recallStart = s.recallStart
-                        )
-                    },
-                    submit = {
-                        val now = TimeSource.Monotonic.markNow()
-                        val recallDuration = truncateDuration(now - s.recallStart)
-                        state = if (s.partialGuess.uppercase() == s.target.uppercase()) {
-                            AppState.Success(
-                                target = s.target,
-                                memoDuration = s.memoDuration,
-                                recallDuration = recallDuration
-                            )
-                        } else {
-                            AppState.Failure(
-                                target = s.target,
-                                guess = s.partialGuess,
-                                memoDuration = s.memoDuration,
-                                recallDuration = recallDuration
-                            )
-                        }
-                    }
+                    update = { guess -> viewModel.updateGuess(guess) },
+                    submit = { viewModel.submitGuess() }
                 )
             }
 
             is AppState.Success -> {
                 val s = state as AppState.Success
                 Surface(
-                    onClick = {
-                        state = AppState.Memo(
-                            target = makeTarget(allowedChars, len),
-                            idx = 0,
-                            start = TimeSource.Monotonic.markNow()
-                        )
-                    }
+                    onClick = { viewModel.start() }
                 ) {
                     SuccessScreen(
                         target = s.target,
@@ -123,13 +66,7 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
             is AppState.Failure -> {
                 val s = state as AppState.Failure
                 Surface(
-                    onClick = {
-                        state = AppState.Memo(
-                            target = makeTarget(allowedChars, len),
-                            idx = 0,
-                            start = TimeSource.Monotonic.markNow()
-                        )
-                    }
+                    onClick = { viewModel.start() }
                 ) {
                     FailureScreen(
                         target = s.target,
@@ -141,30 +78,4 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
             }
         }
     }
-}
-
-fun truncateDuration(duration: Duration): Duration {
-    val millis = duration.toLong(DurationUnit.MILLISECONDS)
-    val truncated = (millis / 10L) * 10L
-    return truncated.toDuration(DurationUnit.MILLISECONDS)
-}
-
-fun makeTarget(allowedChars: List<Char>, len: Int): String {
-    if (allowedChars.size < 2) {
-        throw IllegalArgumentException("List of allowed characters must have at least two elements, but found only ${allowedChars.size}.")
-    }
-    var target = ""
-    for (i in 1..len) {
-        val prev: Char? = if (target.isEmpty()) {
-            null
-        } else {
-            target.last()
-        }
-        var next: Char
-        do {
-            next = allowedChars.random()
-        } while (next == prev)
-        target += next
-    }
-    return target
 }
