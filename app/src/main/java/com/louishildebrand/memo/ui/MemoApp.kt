@@ -85,6 +85,7 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                         val recallDuration = truncateDuration(now - s.recallStart)
                         state = if (s.partialGuess.uppercase() == s.target.uppercase()) {
                             AppState.Success(
+                                target = s.target,
                                 memoDuration = s.memoDuration,
                                 recallDuration = recallDuration
                             )
@@ -112,6 +113,7 @@ fun MemoApp(allowedChars: List<Char> = ALLOWED_CHARS, len: Int = 8) {
                     }
                 ) {
                     SuccessScreen(
+                        target = s.target,
                         memoDuration = s.memoDuration,
                         recallDuration = s.recallDuration
                     )
