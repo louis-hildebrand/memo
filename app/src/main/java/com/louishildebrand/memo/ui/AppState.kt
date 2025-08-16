@@ -17,6 +17,7 @@ sealed interface AppState {
         val recallStart: TimeSource.Monotonic.ValueTimeMark
     ) : AppState
     data class Success(
+        val target: String,
         val memoDuration: Duration,
         val recallDuration: Duration
     ) : AppState
