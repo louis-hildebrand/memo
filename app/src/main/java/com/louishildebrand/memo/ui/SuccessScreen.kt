@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,7 +29,8 @@ fun SuccessScreen(
     modifier: Modifier = Modifier,
     target: String = "ABCDEFGHIJKL",
     memoDuration: Duration = Duration.parse("42s 530ms"),
-    recallDuration: Duration = Duration.parse("9s")
+    recallDuration: Duration = Duration.parse("9s"),
+    settings: MemoSettings = MemoSettings(),
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -36,6 +38,13 @@ fun SuccessScreen(
     ) {
         Column(
             modifier = Modifier.safeContentPadding().padding(16.dp),
+            horizontalAlignment = AbsoluteAlignment.Left,
+            verticalArrangement = Arrangement.Top,
+        ) {
+            ToSettingsButton(settings)
+        }
+        Column(
+            modifier = Modifier.safeContentPadding().padding(72.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
         ) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,7 +34,8 @@ fun FailureScreen(
     target: String = "ABCDEFGHIJKL",
     guess: String = "ADCBEFGHIJK",
     memoDuration: Duration = Duration.parse("1m 5s 200ms"),
-    recallDuration: Duration = Duration.parse("10s 123ms")
+    recallDuration: Duration = Duration.parse("10s 123ms"),
+    settings: MemoSettings = MemoSettings()
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -41,6 +43,13 @@ fun FailureScreen(
     ) {
         Column(
             modifier = Modifier.safeContentPadding().padding(16.dp),
+            horizontalAlignment = AbsoluteAlignment.Left,
+            verticalArrangement = Arrangement.Top,
+        ) {
+            ToSettingsButton(settings)
+        }
+        Column(
+            modifier = Modifier.safeContentPadding().padding(72.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
         ) {

@@ -13,10 +13,7 @@ class MemoViewModel : ViewModel() {
     private val _state = MutableStateFlow<AppState>(AppState.Start)
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    // TODO: Allow updating it
-    private val settings = MemoSettings()
-
-    // TODO: Validate transitions
+    var settings: MemoSettings = MemoSettings()
 
     fun start() {
         when (this.state.value) {
