@@ -28,7 +28,7 @@ fun MemoApp(viewModel: MemoViewModel) {
                 Surface(
                     onClick = { viewModel.start() }
                 ) {
-                    StartScreen(settings = viewModel.settings)
+                    StartScreen()
                 }
 
             is AppState.Memo -> {

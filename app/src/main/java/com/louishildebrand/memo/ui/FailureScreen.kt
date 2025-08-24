@@ -25,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.louishildebrand.memo.R
+import com.louishildebrand.memo.data.MemoSettings
 import kotlin.time.Duration
 
 @Preview(showBackground = true)
@@ -46,7 +47,7 @@ fun FailureScreen(
             horizontalAlignment = AbsoluteAlignment.Left,
             verticalArrangement = Arrangement.Top,
         ) {
-            ToSettingsButton(settings)
+            ToSettingsButton()
         }
         Column(
             modifier = Modifier.safeContentPadding().padding(72.dp),

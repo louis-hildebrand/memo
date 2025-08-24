@@ -6,14 +6,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import com.louishildebrand.memo.SettingsActivity
+import com.louishildebrand.memo.data.MemoSettings
 
 @Composable
-fun ToSettingsButton(settings: MemoSettings) {
+fun ToSettingsButton() {
    val context = LocalContext.current
    Button(
        onClick = {
            val intent = Intent(context, SettingsActivity::class.java)
-           intent.putExtra("settings", settings)
            context.startActivity(intent)
        }
    ) {

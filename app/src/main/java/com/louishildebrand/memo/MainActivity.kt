@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.louishildebrand.memo.ui.MemoApp
-import com.louishildebrand.memo.ui.MemoSettings
 import com.louishildebrand.memo.ui.MemoViewModel
 import com.louishildebrand.memo.ui.theme.MemoTheme
 
@@ -15,13 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val viewModel: MemoViewModel by viewModels()
-
-        @Suppress("DEPRECATION")
-        val maybeSettings = intent.extras?.getSerializable("settings")
-        if (maybeSettings != null) {
-            viewModel.settings = maybeSettings as MemoSettings
-        }
+        val viewModel: MemoViewModel by viewModels { MemoViewModel.Factory }
 
         setContent {
             MemoTheme {

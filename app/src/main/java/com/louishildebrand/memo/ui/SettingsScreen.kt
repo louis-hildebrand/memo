@@ -25,7 +25,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     modifier: Modifier = Modifier
 ) {
-    val state: SettingsState by viewModel.state.collectAsState()
+    val state: SettingsUiState by viewModel.state.collectAsState()
     val context = LocalContext.current
     Column(
         modifier = modifier.safeContentPadding().padding(16.dp)
@@ -33,7 +33,6 @@ fun SettingsScreen(
         Button(
             onClick = {
                 val intent = Intent(context, MainActivity::class.java)
-                intent.putExtra("settings", viewModel.settings)
                 context.startActivity(intent)
             }
         ) {

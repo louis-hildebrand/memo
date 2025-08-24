@@ -1,30 +1,38 @@
 package com.louishildebrand.memo.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.louishildebrand.memo.MemoApplication
+import com.louishildebrand.memo.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 import kotlin.time.toDuration
 
-class MemoViewModel : ViewModel() {
+class MemoViewModel(private val repo: SettingsRepository) : ViewModel() {
     private val _state = MutableStateFlow<AppState>(AppState.Start)
     val state: StateFlow<AppState> = _state.asStateFlow()
-
-    var settings: MemoSettings = MemoSettings()
 
     fun start() {
         when (this.state.value) {
             is AppState.Start,
             is AppState.Success,
             is AppState.Failure -> {
-                this._state.value = AppState.Memo(
-                    target = this.makeTarget(),
-                    idx = 0,
-                    start = TimeSource.Monotonic.markNow(),
-                )
+                viewModelScope.launch {
+                    _state.value = AppState.Memo(
+                        target = makeTarget(),
+                        idx = 0,
+                        start = TimeSource.Monotonic.markNow(),
+                    )
+                }
             }
             else -> {
                 throw IllegalStateException(
@@ -105,14 +113,15 @@ class MemoViewModel : ViewModel() {
         }
     }
 
-    private fun makeTarget(): String {
-        if (this.settings.allowedChars.size < 2) {
+    private suspend fun makeTarget(): String {
+        val settings = this.repo.currentSettings()
+        if (settings.allowedChars.size < 2) {
             throw IllegalArgumentException(
                 "List of allowed characters must have at least two elements,"
-                        + " but found only ${this.settings.allowedChars.size}.")
+                        + " but found only ${settings.allowedChars.size}.")
         }
         var target = ""
-        for (i in 1..this.settings.len) {
+        for (i in 1..settings.len) {
             val prev: Char? = if (target.isEmpty()) {
                 null
             } else {
@@ -120,7 +129,7 @@ class MemoViewModel : ViewModel() {
             }
             var next: Char
             do {
-                next = this.settings.allowedChars.random()
+                next = settings.allowedChars.random()
             } while (next == prev)
             target += next
         }
@@ -131,5 +140,14 @@ class MemoViewModel : ViewModel() {
         val millis = duration.toLong(DurationUnit.MILLISECONDS)
         val truncated = (millis / 10L) * 10L
         return truncated.toDuration(DurationUnit.MILLISECONDS)
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val repo = (this[APPLICATION_KEY] as MemoApplication).settingsRepository
+                MemoViewModel(repo)
+            }
+        }
     }
 }

@@ -1,36 +1,34 @@
 package com.louishildebrand.memo.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.louishildebrand.memo.MemoApplication
+import com.louishildebrand.memo.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
-data class SettingsState(
-    val allowedCharsString: String,
-    val targetLenString: String,
-) {
-    companion object {
-        fun fromSettings(settings: MemoSettings): SettingsState {
-            return SettingsState(
-                allowedCharsString = settings.allowedChars
-                    .toList()
-                    .map{ x -> x.uppercaseChar() }
-                    .sorted()
-                    .joinToString(""),
-                targetLenString = settings.len.toString()
-            )
-        }
-    }
-}
-
-class SettingsViewModel(settings: MemoSettings? = null) : ViewModel() {
-    var settings: MemoSettings = settings ?: MemoSettings()
-
-    private var _state = MutableStateFlow(SettingsState.fromSettings(this.settings))
+class SettingsViewModel(
+    private val repo: SettingsRepository
+) : ViewModel() {
+    private var _state = MutableStateFlow(SettingsUiState.empty())
     val state = this._state.asStateFlow()
 
-    fun updateSettings(settings: MemoSettings) {
-        this.settings = settings
-        this._state.value = SettingsState.fromSettings(this.settings)
+    init {
+        viewModelScope.launch {
+            val settings = repo.currentSettings()
+            _state.value = SettingsUiState(
+                allowedCharsString = settings.allowedChars
+                    .toList()
+                    .sorted()
+                    .joinToString(""),
+                targetLenString = settings.len.toString(),
+            )
+        }
     }
 
     fun updateAllowedChars(newAllowedChars: String) {
@@ -38,10 +36,11 @@ class SettingsViewModel(settings: MemoSettings? = null) : ViewModel() {
             allowedCharsString = newAllowedChars.uppercase()
         )
         val newSet = newAllowedChars.toCharArray().map { x -> x.uppercaseChar() }.toSet()
+        // TODO: Alert user if setting is invalid
         if (newSet.size < 2) return
-        this.settings = this.settings.copy(
-            allowedChars = newSet
-        )
+        viewModelScope.launch {
+            repo.updateAllowedChars(newSet)
+        }
     }
 
     fun updateTargetLen(newLen: String) {
@@ -51,9 +50,21 @@ class SettingsViewModel(settings: MemoSettings? = null) : ViewModel() {
         } catch (exc: NumberFormatException) {
             return
         }
+        // TODO: Alert user if setting is invalid
         if (n <= 2) {
             return
         }
-        this.settings = this.settings.copy(len = n)
+        viewModelScope.launch {
+            repo.updateTargetLen(n)
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val repo = (this[APPLICATION_KEY] as MemoApplication).settingsRepository
+                SettingsViewModel(repo)
+            }
+        }
     }
 }

@@ -18,13 +18,11 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.louishildebrand.memo.R
+import com.louishildebrand.memo.data.MemoSettings
 
 @Preview(showBackground = true)
 @Composable
-fun StartScreen(
-    modifier: Modifier = Modifier,
-    settings: MemoSettings = MemoSettings()
-) {
+fun StartScreen(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = Color(140, 140, 217)
@@ -34,7 +32,7 @@ fun StartScreen(
             horizontalAlignment = AbsoluteAlignment.Left,
             verticalArrangement = Arrangement.Top,
         ) {
-            ToSettingsButton(settings)
+            ToSettingsButton()
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
